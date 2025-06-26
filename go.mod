@@ -1,4 +1,4 @@
-module github.com/yourusername/govna
+module github.com/momentics/govna
 
 go 1.21
 

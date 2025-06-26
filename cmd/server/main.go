@@ -13,7 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/yourusername/govna/pkg/govna"
+	"github.com/momentics/govna/pkg/govna"
 )
 
 var (

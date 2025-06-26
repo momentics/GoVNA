@@ -2,13 +2,16 @@ package govna
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
+	"encoding/binary"
+	"math"
+	"math/cmplx"
+
+	//	"errors"
+	//	"fmt"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/yourusername/govna/internal/util"
+	//"github.com/momentics/govna/internal/util"
 )
 
 // MockSerialPort для симуляции ответов устройства

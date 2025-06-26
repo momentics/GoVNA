@@ -1,5 +1,44 @@
 # GoVNA - Multi-Protocol NanoVNA Library for Go
 
+GoVNA is a high-performance, thread-safe, and extensible library in Go for working with various families of NanoVNA vector network analyzers.
+
+The project is built on a driver-based architecture (the "Bridge" design pattern), which allows for the easy addition of new device support without altering the main API.
+
+## Features
+
+-   **Multi-Protocol Support**: Features implemented support for both the text-based protocol of **NanoVNA V1** and the binary protocol of **NanoVNA V2/LiteVNA**.
+-   **Automatic Device Detection**: The library automatically identifies the connected device type and selects the appropriate driver.
+-   **Thread Safety**: Safe for use in multi-threaded applications, featuring a device pool and mutexes for synchronization.
+-   **Ease of Use**: A unified API for working with any supported device.
+-   **Extensibility**: New drivers for future devices can be added with ease.
+-   **Performance**: Optimized to handle a large number of concurrent connections. For V2, an efficient mode is used to read all data points in a single request.
+-   **Monitoring**: Includes built-in Prometheus metrics for server-side monitoring.
+
+## Supported Devices
+
+| Device Family / Model                                    | Support Status         | Comment                                                              |
+|----------------------------------------------------------|------------------------|----------------------------------------------------------------------|
+| **NanoVNA V1** (H, H4, and high-quality clones)          | ✅ **Full Support**    | The text-based protocol is implemented.                              |
+| **NanoVNA V2** (V2, Plus4, Plus4 Pro) / **LiteVNA** (64) | ✅ **Full Support**    | The binary protocol is implemented based on the `scikit-rf` library. |
+| **Clones**                                               | ✅ **Partial Support** | The device will work if its protocol is compatible with V1 or V2.    |
+
+## Comparative Analysis
+
+| Criterion                       | GoVNA (Go)                                                                                        | PyVNA (Python)                                                                                     | pynanovna (Python)                                                                                   |
+|---------------------------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| **Driver Architecture**         | Cleanly separated: `Driver` interface, `V1Driver`, `V2Driver`, driver factory, and device pool.   | Similar to GoVNA, using ABCs and Python's dynamic typing.                                          | Less modular; drivers are not always clearly separated, often resulting in monolithic code.          |
+| **Protocol Handling**           | V1 is text-based; V2 is binary with precise parsing, optimized for speed.                         | A full port of GoVNA, preserving both binary parsing and the text-based protocol.                  | Primarily uses the text-based protocol; binary parsing is partially implemented and less optimized.  |
+| **Error Handling and Security** | Features strict validation, error masking, rate limiting, and execution as a non-privileged user. | Implements similar security measures adapted for Python.                                           | Lacks explicit protection against DoS, errors, and input validation; oriented toward local use.      |
+| **Concurrency and Scalability** | Utilizes goroutines and a device pool for high scalability.                                       | Employs threads and locks, with concurrency limited by the GIL, resulting in moderate scalability. | Limited scalability; not optimized for multi-threaded operation.                                     |
+| **Integration**                 | Easily integrates with cloud services, microservices, and Prometheus.                             | Integrates excellently with the Python scientific stack (NumPy, SciPy, Pandas).                    | Offers broad support for visualization and calibration but is less focused on server-side scenarios. |
+| **Documentation and Support**   | Detailed, with in-code comments and examples.                                                     | Detailed, with in-code comments and examples; well-documented.                                     | Good documentation with many examples, but features a less formalized architecture.                  |
+
+## Installation
+
+***
+
+***
+
 GoVNA — это высокопроизводительная, потокобезопасная и расширяемая библиотека на Go для работы с различными семействами векторных анализаторов цепей NanoVNA.
 
 Проект построен на основе драйверной архитектуры (паттерн "Мост"), что позволяет легко добавлять поддержку новых устройств, не изменяя основной API.
@@ -20,7 +59,7 @@ GoVNA — это высокопроизводительная, потокобе�
 |----------------------------------------------------------|----------------------------|---------------------------------------------------------------------|
 | **NanoVNA V1** (H, H4, качественные клоны)               | ✅ **Полная поддержка**    | Реализован текстовый протокол.                                      |
 | **NanoVNA V2** (V2, Plus4, Plus4 Pro) / **LiteVNA** (64) | ✅ **Полная поддержка**    | Бинарный протокол реализован на основе `scikit-rf`.                 |
-| **Неизвестные клоны**                                    | ✅ **Частичная поддержка** | Устройство будет работать, если его протокол совместим с V1 или V2. |
+| **Клоны**                                                | ✅ **Частичная поддержка** | Устройство будет работать, если его протокол совместим с V1 или V2. |
 
 ## Сравнительный анализ
 
@@ -30,7 +69,5 @@ GoVNA — это высокопроизводительная, потокобе�
 | **Обработка протоколов**            | V1 — текстовый, V2 — бинарный с точным парсингом, оптимизировано для скорости.                    | Полный порт GoVNA с сохранением бинарного парсинга и текстового протокола.                          | В основном текстовый протокол, бинарный парсинг реализован частично, с меньшей оптимизацией. |
 | **Обработка ошибок и безопасность** | Строгая валидация, маскировка ошибок, rate limiting, запуск от непривилегированного пользователя. | Аналогичные меры безопасности, адаптированные под Python.                                           | Без явной защиты от DoS, ошибок и валидации, ориентирован на локальное использование.        |
 | **Параллелизм и масштабируемость**  | Использование горутин, пул устройств, высокая масштабируемость.                                   | Использование потоков и блокировок, ограниченный параллелизм из-за GIL, умеренная масштабируемость. | Ограниченная масштабируемость, не оптимизирован для многопоточной работы.                    |
-| **Интеграция с экосистемой**        | Легко интегрируется в облачные сервисы, микросервисы, Prometheus.                                 | Отлично интегрируется с научным стеком Python (NumPy, SciPy, Pandas).                               | Широкая поддержка визуализации, калибровки, но менее ориентирована на серверные сценарии.    |
+| **Интеграция**                      | Легко интегрируется в облачные сервисы, микросервисы, Prometheus.                                 | Отлично интегрируется с научным стеком Python (NumPy, SciPy, Pandas).                               | Широкая поддержка визуализации, калибровки, но менее ориентирована на серверные сценарии.    |
 | **Документация и поддержка**        | Подробная, с комментариями и примерами.                                                           | Подробная, с комментариями и примерами, хорошо документирована.                                     | Хорошая документация, много примеров, но менее формализованная архитектура.                  |
-
-## Установка

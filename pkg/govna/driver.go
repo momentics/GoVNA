@@ -7,7 +7,7 @@ import (
 	"go.bug.st/serial"
 	"sync"
 
-	"github.com/yourusername/govna/internal/util"
+	"github.com/momentics/govna/internal/util"
 )
 
 // Driver определяет интерфейс, который должен реализовать каждый драйвер устройства.

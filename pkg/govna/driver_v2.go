@@ -9,7 +9,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/yourusername/govna/internal/util"
+	"github.com/momentics/govna/internal/util"
 )
 
 const (

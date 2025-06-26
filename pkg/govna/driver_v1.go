@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourusername/govna/internal/util"
+	"github.com/momentics/govna/internal/util"
 )
 
 type V1Driver struct {
