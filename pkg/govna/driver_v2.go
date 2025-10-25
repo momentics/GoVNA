@@ -79,14 +79,17 @@ func (d *V2Driver) SetSweep(config SweepConfig) error {
 }
 
 func (d *V2Driver) Scan() (VNAData, error) {
+	if d.config.Points <= 0 {
+		return VNAData{}, errors.New("v2: свип не сконфигурирован или количество точек равно нулю")
+	}
 	if _, err := d.port.Write([]byte{opREADFIFO, addrVALS_FIFO, 0x00}); err != nil {
 		return VNAData{}, err
 	}
 
 	expectedBytes := d.config.Points * 32
 	buf := make([]byte, expectedBytes)
-	if _, err := io.ReadFull(d.port, buf); err != nil {
-		return VNAData{}, fmt.Errorf("ошибка чтения данных V2: %w", err)
+	if n, err := io.ReadFull(d.port, buf); err != nil {
+		return VNAData{}, fmt.Errorf("ошибка чтения данных V2 (получено %d из %d байт): %w", n, expectedBytes, err)
 	}
 	return d.parseBinaryData(buf)
 }
@@ -94,17 +97,27 @@ func (d *V2Driver) Scan() (VNAData, error) {
 func (d *V2Driver) Close() error { return d.port.Close() }
 
 func (d *V2Driver) parseBinaryData(buf []byte) (VNAData, error) {
+	if len(buf)%32 != 0 {
+		return VNAData{}, fmt.Errorf("v2: размер ответа %d не кратен 32 байтам", len(buf))
+	}
+	points := len(buf) / 32
+	if points == 0 {
+		return VNAData{}, errors.New("v2: устройство вернуло пустой ответ")
+	}
+	if d.config.Points != points {
+		return VNAData{}, fmt.Errorf("v2: устройство вернуло %d точек вместо ожидаемых %d", points, d.config.Points)
+	}
 	data := VNAData{
-		Frequencies: make([]float64, d.config.Points),
-		S11:         make([]complex128, d.config.Points),
-		S21:         make([]complex128, d.config.Points),
+		Frequencies: make([]float64, points),
+		S11:         make([]complex128, points),
+		S21:         make([]complex128, points),
 	}
 	var step float64
-	if d.config.Points > 1 {
-		step = (d.config.Stop - d.config.Start) / float64(d.config.Points-1)
+	if points > 1 {
+		step = (d.config.Stop - d.config.Start) / float64(points-1)
 	}
 
-	for i := 0; i < d.config.Points; i++ {
+	for i := 0; i < points; i++ {
 		offset := i * 32
 		data.Frequencies[i] = d.config.Start + float64(i)*step
 		s11_re := math.Float32frombits(binary.LittleEndian.Uint32(buf[offset : offset+4]))

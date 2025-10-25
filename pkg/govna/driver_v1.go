@@ -67,21 +67,43 @@ func (d *V1Driver) readData() (VNAData, error) {
 	scanner := bufio.NewScanner(d.port)
 	for i := 0; i < d.config.Points; i++ {
 		if !scanner.Scan() {
-			return data, fmt.Errorf("недостаточно данных от устройства (получено %d, ожидалось %d)", i, d.config.Points)
+			if err := scanner.Err(); err != nil {
+				return data, fmt.Errorf("v1: ошибка чтения строки %d: %w", i+1, err)
+			}
+			return data, fmt.Errorf("v1: недостаточно данных от устройства (получено %d, ожидалось %d)", i, d.config.Points)
 		}
-		parts := strings.Fields(scanner.Text())
+		line := scanner.Text()
+		parts := strings.Fields(line)
 		if len(parts) < 5 {
-			continue
+			return data, fmt.Errorf("v1: строка %d содержит %d значений, ожидалось 5: %q", i+1, len(parts), line)
 		}
-		freq, _ := strconv.ParseFloat(parts[0], 64)
-		s11_re, _ := strconv.ParseFloat(parts[1], 64)
-		s11_im, _ := strconv.ParseFloat(parts[2], 64)
-		s21_re, _ := strconv.ParseFloat(parts[3], 64)
-		s21_im, _ := strconv.ParseFloat(parts[4], 64)
+		freq, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			return data, fmt.Errorf("v1: не удалось распарсить частоту в строке %d: %w", i+1, err)
+		}
+		s11Re, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return data, fmt.Errorf("v1: не удалось распарсить действительную часть S11 в строке %d: %w", i+1, err)
+		}
+		s11Im, err := strconv.ParseFloat(parts[2], 64)
+		if err != nil {
+			return data, fmt.Errorf("v1: не удалось распарсить мнимую часть S11 в строке %d: %w", i+1, err)
+		}
+		s21Re, err := strconv.ParseFloat(parts[3], 64)
+		if err != nil {
+			return data, fmt.Errorf("v1: не удалось распарсить действительную часть S21 в строке %d: %w", i+1, err)
+		}
+		s21Im, err := strconv.ParseFloat(parts[4], 64)
+		if err != nil {
+			return data, fmt.Errorf("v1: не удалось распарсить мнимую часть S21 в строке %d: %w", i+1, err)
+		}
 
 		data.Frequencies = append(data.Frequencies, freq)
-		data.S11 = append(data.S11, complex(s11_re, s11_im))
-		data.S21 = append(data.S21, complex(s21_re, s21_im))
+		data.S11 = append(data.S11, complex(s11Re, s11Im))
+		data.S21 = append(data.S21, complex(s21Re, s21Im))
+	}
+	if err := scanner.Err(); err != nil {
+		return data, fmt.Errorf("v1: ошибка после чтения данных: %w", err)
 	}
 	return data, nil
 }

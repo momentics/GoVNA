@@ -102,6 +102,26 @@ func TestV1Driver_Scan(t *testing.T) {
 	}
 }
 
+func TestV1Driver_ScanInvalidData(t *testing.T) {
+	mockPort := &MockSerialPort{}
+	driver := NewV1Driver(mockPort)
+	cfg := SweepConfig{Points: 1}
+	driver.SetSweep(cfg)
+
+	mockPort.SetReadData([]byte("1000000 0.5 oops 0.1 -0.1\n"))
+	if _, err := driver.Scan(); err == nil {
+		t.Fatalf("expected error while parsing invalid float, got nil")
+	}
+
+	mockPort = &MockSerialPort{}
+	driver = NewV1Driver(mockPort)
+	driver.SetSweep(cfg)
+	mockPort.SetReadData([]byte("1000000 0.5\n"))
+	if _, err := driver.Scan(); err == nil {
+		t.Fatalf("expected error due to insufficient fields, got nil")
+	}
+}
+
 // Тестирование V2Driver на парсинг бинарных данных
 func TestV2Driver_Scan(t *testing.T) {
 	mockPort := &MockSerialPort{}
@@ -142,6 +162,41 @@ func TestV2Driver_Scan(t *testing.T) {
 	// Сравниваем с небольшой погрешностью из-за float32 -> float64
 	if cmplx.Abs(data.S11[0]-expectedS11) > 1e-6 {
 		t.Errorf("Expected S11 %v, got %v", expectedS11, data.S11[0])
+	}
+}
+
+func TestV2Driver_ScanUnexpectedEOF(t *testing.T) {
+	mockPort := &MockSerialPort{}
+	driver := NewV2Driver(mockPort)
+	cfg := SweepConfig{Start: 1e6, Stop: 1e6, Points: 2}
+	driver.SetSweep(cfg)
+
+	// Передаем данные только для одной точки, чтобы спровоцировать ошибку чтения.
+	var binData bytes.Buffer
+	binData.Write(float32ToBytes(0.5))
+	binData.Write(float32ToBytes(-0.5))
+	binData.Write(make([]byte, 8))
+	binData.Write(float32ToBytes(0.1))
+	binData.Write(float32ToBytes(-0.1))
+	binData.Write(make([]byte, 8))
+	mockPort.SetReadData(binData.Bytes())
+
+	if _, err := driver.Scan(); err == nil {
+		t.Fatalf("expected error due to truncated response, got nil")
+	}
+}
+
+func TestV2Driver_ParseBinaryDataLengthValidation(t *testing.T) {
+	driver := &V2Driver{config: SweepConfig{Start: 1e6, Stop: 2e6, Points: 2}}
+
+	invalidBuf := make([]byte, 12)
+	if _, err := driver.parseBinaryData(invalidBuf); err == nil {
+		t.Fatalf("expected error because buffer size is not multiple of 32")
+	}
+
+	shortBuf := make([]byte, 32)
+	if _, err := driver.parseBinaryData(shortBuf); err == nil {
+		t.Fatalf("expected error because buffer does not match sweep points")
 	}
 }
 
