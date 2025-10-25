@@ -2,7 +2,9 @@ package govna
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"math/cmplx"
 	"strings"
@@ -217,4 +219,128 @@ func float32ToBytes(f float32) []byte {
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], math.Float32bits(f))
 	return buf[:]
+}
+
+type stubDriver struct {
+	mu     sync.Mutex
+	data   []VNAData
+	cursor int
+}
+
+func (s *stubDriver) Identify() (string, error) { return "stub", nil }
+
+func (s *stubDriver) SetSweep(config SweepConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return nil
+}
+
+func (s *stubDriver) Scan() (VNAData, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cursor >= len(s.data) {
+		return VNAData{}, fmt.Errorf("no more data")
+	}
+	result := s.data[s.cursor]
+	s.cursor++
+	return result, nil
+}
+
+func (s *stubDriver) Close() error { return nil }
+
+func newStubDriver(sequence []VNAData) *stubDriver {
+	return &stubDriver{data: sequence}
+}
+
+func applyThreeTermErrorModel(e00, e11, tracking, gamma complex128) complex128 {
+	numerator := e11 * gamma
+	denominator := 1 - tracking*gamma
+	return e00 + numerator/denominator
+}
+
+func TestVNA_CalibrationWorkflow(t *testing.T) {
+	freq := []float64{1e9}
+	e00 := complex(0.05, -0.01)
+	e11 := complex(0.92, 0.02)
+	tracking := complex(0.12, -0.03)
+
+	openMeasurement := applyThreeTermErrorModel(e00, e11, tracking, complex(1, 0))
+	shortMeasurement := applyThreeTermErrorModel(e00, e11, tracking, complex(-1, 0))
+	loadMeasurement := applyThreeTermErrorModel(e00, e11, tracking, complex(0, 0))
+
+	unknownGamma := complex(0.3, -0.1)
+	unknownMeasurement := applyThreeTermErrorModel(e00, e11, tracking, unknownGamma)
+
+	driver := newStubDriver([]VNAData{
+		{Frequencies: freq, S11: []complex128{openMeasurement}},
+		{Frequencies: freq, S11: []complex128{shortMeasurement}},
+		{Frequencies: freq, S11: []complex128{loadMeasurement}},
+		{Frequencies: freq, S11: []complex128{unknownMeasurement}},
+	})
+
+	vna := NewVNA(driver)
+
+	plan := CalibrationPlan{
+		Name: "test",
+		Sweep: SweepConfig{
+			Start:  1e9,
+			Stop:   1e9 + 1,
+			Points: 1,
+		},
+		Steps: []CalibrationStep{
+			{Standard: CalibrationStandardOpen},
+			{Standard: CalibrationStandardShort},
+			{Standard: CalibrationStandardLoad},
+		},
+	}
+
+	profile, err := vna.AcquireCalibration(context.Background(), plan, nil)
+	if err != nil {
+		t.Fatalf("AcquireCalibration failed: %v", err)
+	}
+
+	if profile.Method != CalibrationMethodSOL {
+		t.Fatalf("expected calibration method SOL, got %s", profile.Method)
+	}
+
+	data, err := vna.GetData()
+	if err != nil {
+		t.Fatalf("GetData failed: %v", err)
+	}
+	if len(data.S11) != 1 {
+		t.Fatalf("expected one point after calibration, got %d", len(data.S11))
+	}
+	if cmplx.Abs(data.S11[0]-unknownGamma) > 1e-6 {
+		t.Fatalf("expected calibrated gamma %v, got %v", unknownGamma, data.S11[0])
+	}
+
+	driver.data = append(driver.data, VNAData{Frequencies: freq, S11: []complex128{unknownMeasurement}})
+	vna.ClearCalibration()
+	raw, err := vna.GetData()
+	if err != nil {
+		t.Fatalf("GetData failed after clearing calibration: %v", err)
+	}
+	if cmplx.Abs(raw.S11[0]-unknownMeasurement) > 1e-9 {
+		t.Fatalf("expected raw measurement %v, got %v", unknownMeasurement, raw.S11[0])
+	}
+
+	driver.data = append(driver.data, VNAData{Frequencies: freq, S11: []complex128{unknownMeasurement}})
+	if err := vna.LoadCalibration(profile); err != nil {
+		t.Fatalf("LoadCalibration failed: %v", err)
+	}
+
+	calibratedAgain, err := vna.GetData()
+	if err != nil {
+		t.Fatalf("GetData failed after reloading calibration: %v", err)
+	}
+	if cmplx.Abs(calibratedAgain.S11[0]-unknownGamma) > 1e-6 {
+		t.Fatalf("expected calibrated gamma %v after reload, got %v", unknownGamma, calibratedAgain.S11[0])
+	}
+}
+
+func TestVNA_ApplyCalibrationWithoutProfile(t *testing.T) {
+	vna := NewVNA(newStubDriver(nil))
+	if _, err := vna.ApplyCalibration(VNAData{}); err == nil {
+		t.Fatalf("expected error when applying calibration without profile")
+	}
 }

@@ -11,10 +11,11 @@ import (
 )
 
 type VNA struct {
-	driver Driver
-	mu     sync.RWMutex
-	ctx    context.Context
-	cancel context.CancelFunc
+	driver      Driver
+	mu          sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	calibration *CalibrationProfile
 }
 
 func NewVNA(driver Driver) *VNA {
@@ -44,7 +45,21 @@ func (v *VNA) SetSweep(config SweepConfig) error {
 func (v *VNA) GetData() (VNAData, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return v.driver.Scan()
+
+	data, err := v.driver.Scan()
+	if err != nil {
+		return VNAData{}, err
+	}
+
+	if v.calibration == nil {
+		return data, nil
+	}
+
+	calibrated, err := v.calibration.apply(data)
+	if err != nil {
+		return VNAData{}, err
+	}
+	return calibrated, nil
 }
 
 func (v *VNA) Close() error {
@@ -52,6 +67,38 @@ func (v *VNA) Close() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return v.driver.Close()
+}
+
+func (v *VNA) LoadCalibration(profile *CalibrationProfile) error {
+	if profile == nil {
+		return errors.New("калибровочный профиль не может быть nil")
+	}
+	if err := profile.Validate(); err != nil {
+		return err
+	}
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.calibration = profile
+	return nil
+}
+
+func (v *VNA) ClearCalibration() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.calibration = nil
+}
+
+func (v *VNA) ApplyCalibration(data VNAData) (VNAData, error) {
+	v.mu.RLock()
+	profile := v.calibration
+	v.mu.RUnlock()
+
+	if profile == nil {
+		return VNAData{}, errors.New("калибровочный профиль не загружен")
+	}
+
+	return profile.apply(data)
 }
 
 func (d *VNAData) ToTouchstone() string {
