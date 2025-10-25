@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math"
 	"math/cmplx"
+	"strings"
 
 	//	"errors"
 	//	"fmt"
@@ -19,6 +20,7 @@ type MockSerialPort struct {
 	mu          sync.Mutex
 	readBuffer  bytes.Buffer
 	writeBuffer bytes.Buffer
+	variant     byte
 }
 
 func (m *MockSerialPort) Read(p []byte) (n int, err error) {
@@ -29,14 +31,24 @@ func (m *MockSerialPort) Read(p []byte) (n int, err error) {
 func (m *MockSerialPort) Write(p []byte) (n int, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.writeBuffer.Write(p)
+	n, err = m.writeBuffer.Write(p)
+	if err == nil && len(p) >= 2 && p[0] == opREAD && p[1] == addrDEVICE_VARIANT && m.variant != 0 {
+		m.readBuffer.WriteByte(m.variant)
+	}
+	return n, err
 }
-func (m *MockSerialPort) Close() error                           { return nil }
+func (m *MockSerialPort) Close() error                         { return nil }
 func (m *MockSerialPort) SetReadTimeout(t time.Duration) error { return nil }
 func (m *MockSerialPort) SetReadData(data []byte) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.readBuffer.Write(data)
+}
+
+func (m *MockSerialPort) SetVariant(variant byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.variant = variant
 }
 
 // Тестирование фабрики драйверов на выбор V1
@@ -56,9 +68,9 @@ func TestDriverFactory_SelectsV1(t *testing.T) {
 // Тестирование фабрики драйверов на выбор V2
 func TestDriverFactory_SelectsV2(t *testing.T) {
 	mockPort := &MockSerialPort{}
+	mockPort.SetVariant(0x02)
 	// Ответ V1 должен провалиться, затем V2 должен сработать
-	mockPort.SetReadData([]byte("some other device\n")) // Fail V1
-	mockPort.SetReadData([]byte{0x02})                   // Succeed V2
+	mockPort.SetReadData([]byte("some other device\n"))
 
 	driver, err := driverFactory(mockPort)
 	if err != nil {
@@ -119,10 +131,30 @@ func TestV2Driver_Scan(t *testing.T) {
 		t.Fatalf("Expected 1 point, got %d", len(data.S11))
 	}
 
+	if math.IsNaN(data.Frequencies[0]) {
+		t.Fatalf("Frequency should not be NaN")
+	}
+	if data.Frequencies[0] != cfg.Start {
+		t.Fatalf("Expected frequency %f, got %f", cfg.Start, data.Frequencies[0])
+	}
+
 	expectedS11 := complex(0.5, -0.5)
 	// Сравниваем с небольшой погрешностью из-за float32 -> float64
 	if cmplx.Abs(data.S11[0]-expectedS11) > 1e-6 {
 		t.Errorf("Expected S11 %v, got %v", expectedS11, data.S11[0])
+	}
+}
+
+func TestVNAData_ToTouchstonePrecision(t *testing.T) {
+	data := VNAData{
+		Frequencies: []float64{1.23456789e6},
+		S11:         []complex128{complex(0.5, -0.5)},
+		S21:         []complex128{complex(0.1, -0.1)},
+	}
+
+	touchstone := data.ToTouchstone()
+	if !strings.Contains(touchstone, "1234567.890000") {
+		t.Fatalf("expected frequency to retain fractional part, got %s", touchstone)
 	}
 }
 

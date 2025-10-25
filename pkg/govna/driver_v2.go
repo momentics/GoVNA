@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	opNOP        byte = 0x00
-	opREAD       byte = 0x10
-	opWRITE2     byte = 0x21
-	opWRITE4     byte = 0x22
-	opREADFIFO   byte = 0x18
+	opNOP      byte = 0x00
+	opREAD     byte = 0x10
+	opWRITE2   byte = 0x21
+	opWRITE4   byte = 0x22
+	opREADFIFO byte = 0x18
 
 	addrSWEEP_START    byte = 0x00
 	addrSWEEP_STEP     byte = 0x10
@@ -61,12 +61,15 @@ func (d *V2Driver) Identify() (string, error) {
 
 func (d *V2Driver) SetSweep(config SweepConfig) error {
 	d.config = config
-	step := (config.Stop - config.Start) / float64(config.Points-1)
+	var step float64
+	if config.Points > 1 {
+		step = (config.Stop - config.Start) / float64(config.Points-1)
+	}
 
-	if err := d.writeReg64(addrSWEEP_START, uint64(config.Start)); err != nil {
+	if err := d.writeRegFloat64(addrSWEEP_START, config.Start); err != nil {
 		return err
 	}
-	if err := d.writeReg64(addrSWEEP_STEP, uint64(step)); err != nil {
+	if err := d.writeRegFloat64(addrSWEEP_STEP, step); err != nil {
 		return err
 	}
 	if err := d.writeReg16(addrSWEEP_POINTS, uint16(config.Points)); err != nil {
@@ -96,7 +99,10 @@ func (d *V2Driver) parseBinaryData(buf []byte) (VNAData, error) {
 		S11:         make([]complex128, d.config.Points),
 		S21:         make([]complex128, d.config.Points),
 	}
-	step := (d.config.Stop - d.config.Start) / float64(d.config.Points-1)
+	var step float64
+	if d.config.Points > 1 {
+		step = (d.config.Stop - d.config.Start) / float64(d.config.Points-1)
+	}
 
 	for i := 0; i < d.config.Points; i++ {
 		offset := i * 32
@@ -111,11 +117,11 @@ func (d *V2Driver) parseBinaryData(buf []byte) (VNAData, error) {
 	return data, nil
 }
 
-func (d *V2Driver) writeReg64(addr byte, val uint64) error {
+func (d *V2Driver) writeRegFloat64(addr byte, val float64) error {
 	buf := make([]byte, 10)
 	buf[0] = opWRITE4 + 2
 	buf[1] = addr
-	binary.LittleEndian.PutUint64(buf[2:], val)
+	binary.LittleEndian.PutUint64(buf[2:], math.Float64bits(val))
 	_, err := d.port.Write(buf)
 	return err
 }

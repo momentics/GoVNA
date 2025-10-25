@@ -60,8 +60,8 @@ func (d *VNAData) ToTouchstone() string {
 	sb.WriteString("! Date: " + time.Now().Format(time.RFC3339) + "\n")
 	sb.WriteString("# Hz S RI R 50\n")
 	for i := range d.Frequencies {
-		sb.WriteString(fmt.Sprintf("%d %.6f %.6f %.6f %.6f\n",
-			int(d.Frequencies[i]), real(d.S11[i]), imag(d.S11[i]),
+		sb.WriteString(fmt.Sprintf("%.6f %.6f %.6f %.6f %.6f\n",
+			d.Frequencies[i], real(d.S11[i]), imag(d.S11[i]),
 			real(d.S21[i]), imag(d.S21[i])))
 	}
 	return sb.String()
