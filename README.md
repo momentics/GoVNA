@@ -23,9 +23,11 @@ The project is built on a driver-based architecture (the "Bridge" design pattern
 | **NanoVNA V2** (V2, Plus4, Plus4 Pro) / **LiteVNA** (64) | ✅ **Full Support**    | The binary protocol is implemented with a dedicated parser tailored to the device format. |
 | **Clones**                                               | ✅ **Partial Support** | The device will work if its protocol is compatible with V1 or V2.    |
 
+* VNA devices might use [NanoVNA-X](https://github.com/momentics/NanoVNA-X) firmware for supported hardware. It is prefferable.
+
 ## Comparative Analysis
 
-| Criterion                       | GoVNA (Go)                                                                                        | PyVNA (Python)                                                                                     | pynanovna (Python)                                                                                   |
+| Criterion                       | [GoVNA](https://github.com/momentics/GoVNA) (Go)                                                  | [PyVNA](https://github.com/momentics/PyVNA) (Python)                                               | pynanovna (Python)                                                                                   |
 |---------------------------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
 | **Driver Architecture**         | Cleanly separated: `Driver` interface, `V1Driver`, `V2Driver`, driver factory, and device pool.   | Similar to GoVNA, using ABCs and Python's dynamic typing.                                          | Less modular; drivers are not always clearly separated, often resulting in monolithic code.          |
 | **Protocol Handling**           | V1 is text-based; V2 is binary with precise parsing, optimized for speed.                         | A full port of GoVNA, preserving both binary parsing and the text-based protocol.                  | Primarily uses the text-based protocol; binary parsing is partially implemented and less optimized.  |
@@ -89,9 +91,11 @@ go run ./cmd/server
 | **NanoVNA V2** (V2, Plus4, Plus4 Pro) / **LiteVNA** (64) | ✅ **Полная поддержка**    | Бинарный протокол реализован собственным парсером под формат устройства. |
 | **Клоны**                                                | ✅ **Частичная поддержка** | Устройство будет работать, если его протокол совместим с V1 или V2. |
 
+* Для поддерживаемых устройств VNA рекомендуется использовать прошивку [NanoVNA-X](https://github.com/momentics/NanoVNA-X).
+
 ## Сравнительный анализ
 
-| Аспект                              | GoVNA (Go)                                                                                        | PyVNA (Python)                                                                                      | pynanovna (Python)                                                                           |
+| Аспект                              | [GoVNA](https://github.com/momentics/GoVNA) (Go)                                                  | [PyVNA](https://github.com/momentics/PyVNA) (Python)                                                | pynanovna (Python)                                                                           |
 |-------------------------------------|---------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
 | **Архитектура драйверов**           | Четко разделена: `Driver` interface, `V1Driver`, `V2Driver`, фабрика драйверов, пул устройств.    | Аналогично GoVNA, с использованием ABC и динамической типизации Python.                             | Меньше модульности, драйверы не всегда четко отделены, часто монолитный код.                 |
 | **Обработка протоколов**            | V1 — текстовый, V2 — бинарный с точным парсингом, оптимизировано для скорости.                    | Полный порт GoVNA с сохранением бинарного парсинга и текстового протокола.                          | В основном текстовый протокол, бинарный парсинг реализован частично, с меньшей оптимизацией. |
@@ -100,3 +104,4 @@ go run ./cmd/server
 | **Параллелизм и масштабируемость**  | Использование горутин, пул устройств, высокая масштабируемость.                                   | Использование потоков и блокировок, ограниченный параллелизм из-за GIL, умеренная масштабируемость. | Ограниченная масштабируемость, не оптимизирован для многопоточной работы.                    |
 | **Интеграция**                      | Легко интегрируется в облачные сервисы, микросервисы, Prometheus.                                 | Отлично интегрируется с научным стеком Python (NumPy, SciPy, Pandas).                               | Широкая поддержка визуализации, калибровки, но менее ориентирована на серверные сценарии.    |
 | **Документация и поддержка**        | Подробная, с комментариями и примерами.                                                           | Подробная, с комментариями и примерами, хорошо документирована.                                     | Хорошая документация, много примеров, но менее формализованная архитектура.                  |
+
